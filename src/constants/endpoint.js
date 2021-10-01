@@ -1,3 +1,2 @@
-const isLocal = true
-export const socketEndpoint = isLocal ? 'ws://localhost:3000' : 'ws://gomokuserver.herokuapp.com'
-export const apiEndpoint = isLocal ? 'http://localhost:3000' : 'https://gomokuserver.herokuapp.com'
+export const apiEndpoint = process.env.REACT_APP_API_ENDPOINT
+export const socketEndpoint = process.env.REACT_APP_SOCKET_ENDPOINT
