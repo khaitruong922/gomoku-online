@@ -8,9 +8,10 @@ export default function RoomCard({ room }) {
     const { id: roomId, players = [] } = room
     const socket = useContext(SocketContext)
     const player = useAuthStore(s => s.player)
+    const { _id: playerId } = player || {}
 
     function joinRoom() {
-        socket.emit('joinRoom', { player, roomId })
+        socket.emit('joinRoom', { playerId, roomId })
     }
 
     return (

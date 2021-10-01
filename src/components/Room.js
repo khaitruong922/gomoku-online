@@ -20,6 +20,7 @@ function ActivityLog() {
     const height = 200
     const logsRef = useRef(null)
     const socket = useContext(SocketContext)
+
     const [logs, setLogs] = useState([])
 
     function addLog(log) {
@@ -53,6 +54,7 @@ function ActivityLog() {
 export default function Room({ roomId }) {
     const player = useAuthStore(s => s.player)
     const socket = useContext(SocketContext)
+    const { _id: playerId } = player || {}
     const [players, setPlayers] = useState([])
 
     useEffect(() => {
@@ -66,7 +68,7 @@ export default function Room({ roomId }) {
         }
     }, [])
     function leaveRoom() {
-        socket.emit('leaveRoom', { playerId: player._id, roomId })
+        socket.emit('leaveRoom', { playerId, roomId })
     }
 
     return (
