@@ -8,6 +8,7 @@ import SocketContext from "../context/SocketContext"
 import useAuthStore from "../stores/useAuthStore"
 import buildPlayerString from "../util/buildPlayerString"
 import { formatNumberWithSign } from "../util/formatNumberWithSign"
+import Board, { E } from "./game/Board"
 
 function PlayerPanel({ player, isHost = false, ready = false }) {
     return (
@@ -29,8 +30,6 @@ function ActivityLog() {
 
     function addLog(log) {
         let shouldScrollDown = logsRef.current.scrollTop + height === logsRef.current.scrollHeight
-        console.log(logsRef.current.scrollTop)
-        console.log(logsRef.current.scrollHeight)
 
         setLogs(logs => [...logs, log])
         if (shouldScrollDown) logsRef.current.scrollTop = logsRef.current.scrollHeight
@@ -43,13 +42,14 @@ function ActivityLog() {
         socket.on('playerLeaveRoom', ({ playerId, username }) => {
             addLog(`${username} has left the room`)
         })
-        socket.on('startGame', () => {
+        const startGameHandler = () => {
             addLog(`Game has started!`)
-        })
+        }
+        socket.on('startGame', startGameHandler)
         return () => {
             socket.off('playerJoinRoom')
             socket.off('playerLeaveRoom')
-            socket.off('startGame')
+            socket.off('startGame', startGameHandler)
         }
     })
     return (
@@ -60,6 +60,8 @@ function ActivityLog() {
 }
 
 export default function Room({ roomId }) {
+    const [isPlaying, setPlaying] = useState(false)
+    const [stone, setStone] = useState(E)
     const player = useAuthStore(s => s.player)
     const socket = useContext(SocketContext)
     const { _id: playerId } = player || {}
@@ -70,6 +72,7 @@ export default function Room({ roomId }) {
     useEffect(() => {
         socket.on('roomPlayersChanged', ({ players }) => {
             setPlayers(players)
+            if (players.length === 1) setReady(false)
         })
 
         socket.on('ready', () => {
@@ -79,17 +82,26 @@ export default function Room({ roomId }) {
         socket.on('notReady', () => {
             setReady(false)
         })
+        const startGameHandler = ({ stone }) => {
+            setPlaying(true)
+            setStone(stone)
+        }
+        socket.on('startGame', startGameHandler)
 
         return () => {
             socket.off('roomPlayerChanged')
             socket.off('ready')
             socket.off('notReady')
+            socket.off('startGame', startGameHandler)
+            console.log('Room unmounted')
         }
     }, [])
 
 
     function leaveRoom() {
         socket.emit('leaveRoom', { playerId, roomId })
+        setStone(E)
+        setPlaying(false)
     }
 
     function startGame() {
@@ -101,26 +113,26 @@ export default function Room({ roomId }) {
     }
 
     return (
-        <Flex direction='column'>
+        <Flex direction='column' mb={8}>
             <Flex align='center' mb={8}>
                 <Text fontWeight={600} fontSize='2xl'> Room #{roomId}</Text>
                 <Box ml='auto' >
                     {
-                        isHost ?
+                        !isPlaying &&
+                        (isHost ?
                             <Button onClick={startGame} isDisabled={!ready} _focus={{ boxShadow: 'none' }} colorScheme='pink'>Start game</Button> :
                             <Button w='100px' onClick={changeReadyState} _focus={{ boxShadow: 'none' }} colorScheme={ready ? 'blackAlpha' : 'pink'}>{ready ? 'Not ready' : 'Ready'}</Button>
+                        )
                     }
 
-                    <Button onClick={leaveRoom} colorScheme='gray' ml={2}>Leave room</Button>
+                    <Button onClick={leaveRoom} _focus={{ boxShadow: 'none' }} colorScheme='gray' ml={2}>Leave room</Button>
                 </Box>
             </Flex>
             <SimpleGrid columns={4}>
-                <GridItem colSpan={3}>
-                    <Flex align='center' justify='center'>
-                        <Text>Game</Text>
-                    </Flex>
+                <GridItem colSpan={[4, null, null, 3]}>
+                    <Board roomId={roomId} stone={stone} isPlaying={isPlaying} />
                 </GridItem>
-                <GridItem colSpan={1}>
+                <GridItem colSpan={[4, null, null, 1]}>
                     <Text fontWeight={600} fontSize='2xl' mb={2}>Player 1</Text>
                     <PlayerPanel player={players[0]} isHost />
                     <Text fontWeight={600} fontSize='2xl' my={2}>Player 2</Text>

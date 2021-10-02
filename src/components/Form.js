@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/button";
 import { FormControl, FormLabel } from "@chakra-ui/form-control";
 import { Input, InputGroup } from "@chakra-ui/input";
-import { Box, Divider, Flex, Text } from "@chakra-ui/layout";
+import { Box, Divider, Flex, SimpleGrid, Text } from "@chakra-ui/layout";
 import { useState } from "react";
 import api from "../api/api";
 import useInput from "../hooks/useInput";
@@ -41,17 +41,16 @@ function LoginForm() {
 
     return (
         <form onSubmit={onFormSubmit}>
-            <Flex w='300px' direction='column' align='center'>
-                <FormControl isRequired id='login-username' mb={2}>
-                    <FormLabel>Username</FormLabel>
-                    <Input value={username} onInput={onUsernameInput} />
-                </FormControl>
-                <FormControl isRequired id='login-password' mb={2}>
-                    <FormLabel>Password</FormLabel>
-                    <Input value={password} onInput={onPasswordInput} type='password' />
-                </FormControl>
-                <Button type='submit' isLoading={submitting} isFullWidth mt={2} colorScheme='pink'>Login</Button>
-            </Flex>
+            <Text mb={2} align='center' fontSize='3xl' fontWeight={600}>Login</Text>
+            <FormControl isRequired id='login-username' mb={2}>
+                <FormLabel>Username</FormLabel>
+                <Input value={username} onInput={onUsernameInput} />
+            </FormControl>
+            <FormControl isRequired id='login-password' mb={2}>
+                <FormLabel>Password</FormLabel>
+                <Input value={password} onInput={onPasswordInput} type='password' />
+            </FormControl>
+            <Button type='submit' isLoading={submitting} isFullWidth mt={2} colorScheme='pink'>Login</Button>
         </form>
     )
 }
@@ -92,37 +91,29 @@ function RegisterForm() {
 
     return (
         <form onSubmit={onFormSubmit}>
-            <Flex w='300px' direction='column' align='center'>
-                <FormControl isRequired id='register-username' mb={2}>
-                    <FormLabel>Username</FormLabel>
-                    <Input value={username} onInput={onUsernameInput} />
-                </FormControl>
-                <FormControl isRequired id='register-password' mb={2}>
-                    <FormLabel>Password</FormLabel>
-                    <Input value={password} onInput={onPasswordInput} type='password' />
-                </FormControl>
-                <FormControl isRequired id='register-cpassword' mb={2}>
-                    <FormLabel>Confirm password</FormLabel>
-                    <Input value={confirmPassword} onInput={onConfirmPasswordInput} type='password' />
-                </FormControl>
-                <Button type='submit' isLoading={submitting} isFullWidth mt={2} colorScheme='pink'>Register</Button>
-            </Flex>
+            <Text mb={2} align='center' fontSize='3xl' fontWeight={600}>Register</Text>
+            <FormControl isRequired id='register-username' mb={2}>
+                <FormLabel>Username</FormLabel>
+                <Input value={username} onInput={onUsernameInput} />
+            </FormControl>
+            <FormControl isRequired id='register-password' mb={2}>
+                <FormLabel>Password</FormLabel>
+                <Input value={password} onInput={onPasswordInput} type='password' />
+            </FormControl>
+            <FormControl isRequired id='register-cpassword' mb={2}>
+                <FormLabel>Confirm password</FormLabel>
+                <Input value={confirmPassword} onInput={onConfirmPasswordInput} type='password' />
+            </FormControl>
+            <Button type='submit' isLoading={submitting} isFullWidth mt={2} colorScheme='pink'>Register</Button>
         </form >
     )
 }
 
 export default function Form() {
     return (
-        <Flex align='center' justify='center' border='2px' borderColor='pink.400' h='400px' p={4} boxShadow='md'>
-            <Flex direction='column' justify='center' mr={10} p={4}>
-                <Text mb={2} align='center' fontSize='3xl' fontWeight={600}>Login</Text>
-                <LoginForm />
-            </Flex>
-            <Divider orientation='vertical' />
-            <Flex direction='column' justify='center' ml={10} p={4}>
-                <Text mb={2} align='center' fontSize='3xl' fontWeight={600}>Register</Text>
-                <RegisterForm />
-            </Flex>
-        </Flex>
+        <SimpleGrid mx='auto' p={4} w={['100%', null, '75%', '50%']} spacing={8} columns={[1, 1, 2, 2]}>
+            <LoginForm />
+            <RegisterForm />
+        </SimpleGrid>
     )
 }
