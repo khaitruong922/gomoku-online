@@ -2,6 +2,7 @@ import { Box, Flex, SimpleGrid } from "@chakra-ui/layout"
 import { useCallback, useContext, useEffect, useState } from "react"
 import SocketContext from "../../context/SocketContext"
 import useAuthStore from "../../stores/useAuthStore"
+import clone2D from "../../util/clone2D"
 import Cell from "./Cell"
 
 export const E = ''
@@ -34,37 +35,30 @@ const emptyBoard = [
     [E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E,],
 ]
 
-export default function Board({ isPlaying, stone, roomId }) {
-    const [isMyTurn, setMyTurn] = useState(false)
-    const [board, setBoard] = useState(emptyBoard)
+export default function Board({ isPlaying, stone, roomId, isMyTurn, onMove }) {
+    const [board, setBoard] = useState(clone2D(emptyBoard))
     const socket = useContext(SocketContext)
     const player = useAuthStore(s => s.player)
     const { _id: playerId } = player || {}
 
-
-    const addMove = useCallback(({ r, c, stone }) => {
-        if (board[r][c] === stone) return
-        board[r][c] = stone
-        setBoard(board)
-    }, [board])
-
     useEffect(() => {
-        const startGameHandler = ({ stone }) => {
-            if (stone === X) setMyTurn(true)
-
+        const addMove = (({ r, c, stone }) => {
+            setBoard(board => {
+                const newBoard = clone2D(board)
+                newBoard[r][c] = stone
+                return newBoard
+            })
+        })
+        console.log('board use effect')
+        const startGameHandler = () => {
+            setBoard(clone2D(emptyBoard))
         }
         socket.on('startGame', startGameHandler)
-        socket.on('yourTurn', () => {
-            console.log('my turn')
-            setMyTurn(true)
-        })
         socket.on('move', ({ r, c, stone }) => {
             console.log({ r, c, stone })
             addMove({ r, c, stone })
         })
-
         return () => {
-            socket.off('yourTurn')
             socket.off('move')
             socket.off('startGame', startGameHandler)
             console.log('board unmounted')
@@ -74,9 +68,9 @@ export default function Board({ isPlaying, stone, roomId }) {
 
     function onCellClick({ r, c }) {
         if (!isMyTurn) return
-        setMyTurn(false)
-        addMove({ r, c, stone })
+        if (board[r][c] !== E) return
         socket.emit('move', { playerId, r, c, roomId })
+        onMove()
     }
 
     return (

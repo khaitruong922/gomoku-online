@@ -8,16 +8,20 @@ import SocketContext from "../context/SocketContext"
 import useAuthStore from "../stores/useAuthStore"
 import buildPlayerString from "../util/buildPlayerString"
 import { formatNumberWithSign } from "../util/formatNumberWithSign"
-import Board, { E } from "./game/Board"
+import Board, { E, O, X } from "./game/Board"
 
-function PlayerPanel({ player, isHost = false, ready = false }) {
+function PlayerPanel({ player, isPlaying, myStone, isHost = false, isMyTurn, isMe, ready = false }) {
+    const stone = (myStone === X && isMe) || (myStone === O && !isMe) ? X : (myStone === O && isMe) || (myStone === X && !isMe) ? O : E
     return (
-        <Flex my={2} p={4} align='center' boxShadow='md'>
-            <Avatar boxSize='50px' mr={3} />
-            <Text mr={3} fontSize='lg'>{player ? buildPlayerString(player) : 'waiting for player...'}</Text>
-            {isHost && <Icon boxSize='20px' as={FaCrown} color='yellow.400' />}
-            {!isHost && <Icon boxSize='20px' as={FaCheckCircle} color={ready ? 'green.500' : 'blackAlpha.500'} />}
-        </Flex>
+        <>
+            <Text fontWeight={600} color={isPlaying && ((isMyTurn && isMe) || (!isMyTurn && !isMe)) ? 'pink.400' : 'black'} fontSize='2xl' my={2}>Player {isHost ? 1 : 2} {stone ? `(${stone})` : ''}</Text>
+            <Flex my={2} p={4} align='center' boxShadow='md'>
+                <Avatar boxSize='50px' mr={3} />
+                <Text mr={3} fontSize='lg'>{player ? buildPlayerString(player) : 'waiting for player...'}</Text>
+                {isHost && <Icon boxSize='20px' as={FaCrown} color='yellow.400' />}
+                {!isHost && <Icon boxSize='20px' as={FaCheckCircle} color={ready ? 'green.500' : 'blackAlpha.500'} />}
+            </Flex>
+        </>
     )
 }
 
@@ -42,6 +46,10 @@ function ActivityLog() {
         socket.on('playerLeaveRoom', ({ playerId, username }) => {
             addLog(`${username} has left the room`)
         })
+        const playerWinHandler = ({ playerId, username }) => {
+            addLog(`${username} has win the game`)
+        }
+        socket.on('playerWin', playerWinHandler)
         const startGameHandler = () => {
             addLog(`Game has started!`)
         }
@@ -49,6 +57,7 @@ function ActivityLog() {
         return () => {
             socket.off('playerJoinRoom')
             socket.off('playerLeaveRoom')
+            socket.off('playerWin', playerWinHandler)
             socket.off('startGame', startGameHandler)
         }
     })
@@ -61,7 +70,8 @@ function ActivityLog() {
 
 export default function Room({ roomId }) {
     const [isPlaying, setPlaying] = useState(false)
-    const [stone, setStone] = useState(E)
+    const [isMyTurn, setMyTurn] = useState(false)
+    const [stone, setStone] = useState(null)
     const player = useAuthStore(s => s.player)
     const socket = useContext(SocketContext)
     const { _id: playerId } = player || {}
@@ -82,16 +92,32 @@ export default function Room({ roomId }) {
         socket.on('notReady', () => {
             setReady(false)
         })
+
+        socket.on('yourTurn', () => {
+            console.log('my turn')
+            setMyTurn(true)
+        })
+
         const startGameHandler = ({ stone }) => {
             setPlaying(true)
             setStone(stone)
         }
         socket.on('startGame', startGameHandler)
 
+        const playerWinHandler = ({ playerId, username }) => {
+            setPlaying(false)
+            setStone(null)
+            setMyTurn(false)
+            setReady(false)
+        }
+        socket.on('playerWin', playerWinHandler)
+
         return () => {
             socket.off('roomPlayerChanged')
+            socket.off('yourTurn')
             socket.off('ready')
             socket.off('notReady')
+            socket.off('playerWin', playerWinHandler)
             socket.off('startGame', startGameHandler)
             console.log('Room unmounted')
         }
@@ -130,13 +156,11 @@ export default function Room({ roomId }) {
             </Flex>
             <SimpleGrid columns={4}>
                 <GridItem colSpan={[4, null, null, 3]}>
-                    <Board roomId={roomId} stone={stone} isPlaying={isPlaying} />
+                    <Board isMyTurn={isMyTurn} onMove={() => setMyTurn(false)} roomId={roomId} stone={stone} isPlaying={isPlaying} />
                 </GridItem>
                 <GridItem colSpan={[4, null, null, 1]}>
-                    <Text fontWeight={600} fontSize='2xl' mb={2}>Player 1</Text>
-                    <PlayerPanel player={players[0]} isHost />
-                    <Text fontWeight={600} fontSize='2xl' my={2}>Player 2</Text>
-                    <PlayerPanel player={players[1]} ready={ready} />
+                    <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[0]?._id === playerId} player={players[0]} myStone={stone} isHost />
+                    <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[1]?._id === playerId} player={players[1]} myStone={stone} ready={ready} />
                     <Text fontWeight={600} fontSize='2xl' my={2}>ELO</Text>
                     <Text>
                         win {formatNumberWithSign(10)} / draw {formatNumberWithSign(0)} / lose {formatNumberWithSign(-10)}
