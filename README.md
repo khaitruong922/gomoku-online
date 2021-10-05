@@ -1,6 +1,6 @@
 # Gomoku Online
 
-An online multiplayer Gomoku (Five in a Row) - a strategy board game. (working in progress)
+Online multiplayer Gomoku (Five in a Row) - a strategy board game. (working in progress)
 
 [Game rules - Wikipedia](https://en.wikipedia.org/wiki/Gomoku)
 
@@ -8,7 +8,7 @@ An online multiplayer Gomoku (Five in a Row) - a strategy board game. (working i
 
 ## Link
 
-https://gomokuonline.netlify.app/
+[Play here](https://gomokuonline.netlify.app/)
 
 ## Features
 
