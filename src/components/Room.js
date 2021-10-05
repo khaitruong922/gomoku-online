@@ -4,7 +4,7 @@ import Icon from "@chakra-ui/icon"
 import { Box, Flex, GridItem, SimpleGrid, Text } from "@chakra-ui/layout"
 import { useContext, useEffect, useRef, useState } from "react"
 import { FaCheckCircle, FaCrown } from "react-icons/fa"
-import SocketContext from "../context/SocketContext"
+import SocketContext, { useSocket } from "../context/SocketContext"
 import useAuthStore from "../stores/useAuthStore"
 import buildPlayerString from "../util/buildPlayerString"
 import { formatNumberWithSign } from "../util/formatNumberWithSign"
@@ -68,11 +68,49 @@ function ActivityLog() {
     )
 }
 
+function EloText() {
+    const defaultData = { win: 0, draw: 0, lose: 0 }
+    const [display, setDisplay] = useState(false)
+    const [data, setData] = useState(defaultData)
+    const socket = useSocket()
+    useEffect(() => {
+        socket.on('eloPreview', ({ win, draw, lose }) => {
+            setDisplay(true)
+            setData({ win, draw, lose })
+        })
+        const roomPlayersChangedHandler = ({ players }) => {
+            if (players.length === 1) {
+                setDisplay(false)
+                setData(defaultData)
+            }
+        }
+        socket.on('roomPlayersChanged', roomPlayersChangedHandler)
+        return () => {
+            socket.off('eloPreview')
+            socket.off('roomPlayersChanged', roomPlayersChangedHandler)
+        }
+    })
+    return (
+        <>
+            {
+                display ?
+                    <Text>
+                        win {formatNumberWithSign(data.win)} / draw {formatNumberWithSign(data.draw)} / lose {formatNumberWithSign(data.lose)}
+                    </ Text > :
+                    <Text>
+                        ?
+                    </Text>
+            }
+        </>
+    )
+}
+
 export default function Room({ roomId }) {
     const [isPlaying, setPlaying] = useState(false)
     const [isMyTurn, setMyTurn] = useState(false)
     const [stone, setStone] = useState(null)
     const player = useAuthStore(s => s.player)
+    const fetchCurrentUser = useAuthStore(s => s.fetchCurrentUser)
     const socket = useContext(SocketContext)
     const { _id: playerId } = player || {}
     const [players, setPlayers] = useState([])
@@ -80,11 +118,11 @@ export default function Room({ roomId }) {
     const isHost = players[0]?._id === playerId
 
     useEffect(() => {
-        socket.on('roomPlayersChanged', ({ players }) => {
+        const roomPlayersChangedHandler = ({ players }) => {
             setPlayers(players)
             if (players.length === 1) setReady(false)
-        })
-
+        }
+        socket.on('roomPlayersChanged', roomPlayersChangedHandler)
         socket.on('ready', () => {
             setReady(true)
         })
@@ -104,16 +142,17 @@ export default function Room({ roomId }) {
         }
         socket.on('startGame', startGameHandler)
 
-        const playerWinHandler = ({ playerId, username }) => {
+        const playerWinHandler = async ({ playerId, username }) => {
             setPlaying(false)
             setStone(null)
             setMyTurn(false)
             setReady(false)
+            await fetchCurrentUser()
         }
         socket.on('playerWin', playerWinHandler)
 
         return () => {
-            socket.off('roomPlayerChanged')
+            socket.off('roomPlayersChanged', roomPlayersChangedHandler)
             socket.off('yourTurn')
             socket.off('ready')
             socket.off('notReady')
@@ -150,7 +189,6 @@ export default function Room({ roomId }) {
                             <Button w='100px' onClick={changeReadyState} _focus={{ boxShadow: 'none' }} colorScheme={ready ? 'blackAlpha' : 'pink'}>{ready ? 'Not ready' : 'Ready'}</Button>
                         )
                     }
-
                     <Button onClick={leaveRoom} _focus={{ boxShadow: 'none' }} colorScheme='gray' ml={2}>Leave room</Button>
                 </Box>
             </Flex>
@@ -162,9 +200,7 @@ export default function Room({ roomId }) {
                     <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[0]?._id === playerId} player={players[0]} myStone={stone} isHost />
                     <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[1]?._id === playerId} player={players[1]} myStone={stone} ready={ready} />
                     <Text fontWeight={600} fontSize='2xl' my={2}>ELO</Text>
-                    <Text>
-                        win {formatNumberWithSign(10)} / draw {formatNumberWithSign(0)} / lose {formatNumberWithSign(-10)}
-                    </Text>
+                    <EloText />
                     <Text fontWeight={600} fontSize='2xl' my={2}>Activity</Text>
                     <ActivityLog />
                 </GridItem>

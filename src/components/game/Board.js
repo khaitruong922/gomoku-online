@@ -58,6 +58,9 @@ export default function Board({ isPlaying, stone, roomId, isMyTurn, onMove }) {
             console.log({ r, c, stone })
             addMove({ r, c, stone })
         })
+        socket.on('resetBoard', () => {
+            setBoard(clone2D(emptyBoard))
+        })
         return () => {
             socket.off('move')
             socket.off('startGame', startGameHandler)

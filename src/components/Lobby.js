@@ -1,6 +1,7 @@
 import { Button } from "@chakra-ui/button";
 import { Box, Flex, GridItem, SimpleGrid, Text } from "@chakra-ui/layout";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { chakra } from "@chakra-ui/system";
+import { useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { socketEndpoint } from "../constants/endpoint";
 import SocketContext from "../context/SocketContext";
@@ -20,25 +21,51 @@ function RoomList() {
         socket.emit('requestRooms')
         socket.on('roomsChanged', ({ rooms }) => {
             setRooms(getArrayEntries(rooms))
-            console.log('roomsChanged')
-            console.log(rooms)
         })
         return () => {
             socket.off('roomsChanged')
         }
-    }, [])
+    }, [socket])
+
 
     return (
         <>
             <Text fontSize='2xl' mb={2} fontWeight={600}>Rooms ({rooms.length})</Text>
-            {rooms.map(room => <RoomCard key={room.id} room={room} />)}
+            <Box height='600px' overflowY='auto' px={4}>
+                {rooms.map(room => <RoomCard key={room.id} room={room} />)}
+            </Box>
         </>
     )
 }
+
+function PlayerList() {
+    const [players, setPlayers] = useState([])
+    const socket = useContext(SocketContext)
+    useEffect(() => {
+        socket.emit('requestPlayers')
+        socket.on('playersChanged', ({ players }) => {
+            setPlayers(getArrayEntries(players))
+        })
+        return () => {
+            socket.off('playersChanged')
+        }
+    }, [socket])
+
+    return (
+        <>
+            <Text fontSize='2xl' mb={2} fontWeight={600}>Online players ({players.length})</Text>
+            <Box height='600px' overflowY='auto'>
+                {players.map(player => <Text key={player._id}>{player.username} ({player.elo})</Text>)}
+            </Box>
+        </>
+    )
+}
+
+
 export default function Lobby() {
     const [roomId, setRoomId] = useState(null)
     const player = useAuthStore(s => s.player)
-    const { _id: playerId } = player || {}
+    const { _id: playerId, elo, username } = player || {}
     const logout = useAuthStore(s => s.logout)
     const [forceDisconnected, setForceDisconnected] = useState(false)
     const [hasJoinLobby, setJoinLobby] = useState(false)
@@ -78,8 +105,6 @@ export default function Lobby() {
         }
     }, [socket])
 
-    const { username } = player || {}
-
     function createRoom() {
         socket.emit('createRoom', { playerId })
     }
@@ -93,16 +118,24 @@ export default function Lobby() {
                             roomId !== null ? <Room roomId={roomId} /> :
                                 <>
                                     <Flex align='center'>
-                                        <Text fontSize='xl' mr={2}>Welcome, {username}!</Text>
+                                        <Box>
+                                            <Text fontSize='xl' mr={2}>Welcome, {username}!</Text>
+                                            <Text fontSize='xl' mr={2}><chakra.span fontWeight={600}>ELO:</chakra.span> {elo}</Text>
+                                        </Box>
                                         <Box ml='auto'>
                                             <Button type='button' onClick={createRoom} mr={2} _focus={{ boxShadow: 'none' }} border colorScheme='pink'>Create room</Button>
                                             <Button type='button' onClick={logout} mr={2} _focus={{ boxShadow: 'none' }} border colorScheme='gray'>Log out</Button>
                                         </Box>
                                     </Flex>
-                                    <SimpleGrid columns={2}>
+                                    <SimpleGrid columns={2} spacing={4} mt={4}>
                                         <GridItem>
                                             <Box>
                                                 <RoomList />
+                                            </Box>
+                                        </GridItem>
+                                        <GridItem>
+                                            <Box>
+                                                <PlayerList />
                                             </Box>
                                         </GridItem>
                                     </SimpleGrid>
