@@ -8,7 +8,7 @@ Online multiplayer Gomoku (Five in a Row) - a strategy board game. (working in p
 
 ## Link
 
-https://gomokuonline.netlify.app/
+[Play here](https://gomokuonline.netlify.app/)
 
 ## Features
 
