@@ -2,6 +2,7 @@ import { Avatar } from "@chakra-ui/avatar"
 import { Button } from "@chakra-ui/button"
 import Icon from "@chakra-ui/icon"
 import { Box, Flex, GridItem, SimpleGrid, Text } from "@chakra-ui/layout"
+import { Progress } from "@chakra-ui/react"
 import { useContext, useEffect, useRef, useState } from "react"
 import { FaCheckCircle, FaCrown } from "react-icons/fa"
 import SocketContext, { useSocket } from "../context/SocketContext"
@@ -9,15 +10,31 @@ import useAuthStore from "../stores/useAuthStore"
 import buildPlayerString from "../util/buildPlayerString"
 import { formatNumberWithSign } from "../util/formatNumberWithSign"
 import Board, { E, O, X } from "./game/Board"
+import useCountdown from '../hooks/useCountdown'
+import CountdownContext, { useCountdownContext } from "../context/CountdownContext"
+
+function TimeIndicator({ playerId, isCurrentPlayer }) {
+    const socket = useSocket()
+    const { percentage } = useCountdownContext()
+    useEffect(() => {
+        return () => {
+            console.log('timer unmounted')
+        }
+    }, [socket, playerId])
+    return (<Progress value={isCurrentPlayer ? percentage : 0} size='sm' colorScheme='pink' />)
+}
 
 function PlayerPanel({ player, isPlaying, myStone, isHost = false, isMyTurn, isMe, ready = false }) {
+    const { _id: playerId } = player || {}
+    const isCurrentPlayer = (isMyTurn && isMe) || (!isMyTurn && !isMe)
     const stone = (myStone === X && isMe) || (myStone === O && !isMe) ? X : (myStone === O && isMe) || (myStone === X && !isMe) ? O : E
     return (
         <>
-            <Text fontWeight={600} color={isPlaying && ((isMyTurn && isMe) || (!isMyTurn && !isMe)) ? 'pink.400' : 'black'} fontSize='2xl' my={2}>Player {isHost ? 1 : 2} {stone ? `(${stone})` : ''}</Text>
+            <Text fontWeight={600} color={isPlaying && isCurrentPlayer ? 'pink.400' : 'black'} fontSize='2xl' my={2}>Player {isHost ? 1 : 2} {stone ? `(${stone})` : ''}</Text>
+            <TimeIndicator playerId={playerId} isCurrentPlayer={isCurrentPlayer} />
             <Flex my={2} p={4} align='center' boxShadow='md'>
                 <Avatar boxSize='50px' mr={3} />
-                <Text mr={3} fontSize='lg'>{player ? buildPlayerString(player) : 'waiting for player...'}</Text>
+                <Text mr={3} fontSize='lg' fontWeight={500}>{player ? buildPlayerString(player) : 'waiting for player...'}</Text>
                 {isHost && <Icon boxSize='20px' as={FaCrown} color='yellow.400' />}
                 {!isHost && <Icon boxSize='20px' as={FaCheckCircle} color={ready ? 'green.500' : 'blackAlpha.500'} />}
             </Flex>
@@ -40,23 +57,27 @@ function ActivityLog() {
     }
 
     useEffect(() => {
-        socket.on('playerJoinRoom', ({ player }) => {
+        const playerJoinRoomHandler = ({ player }) => {
             addLog(`${player?.username} has joined the room`)
-        })
-        socket.on('playerLeaveRoom', ({ playerId, username }) => {
+        }
+
+        const playerLeaveRoomHandler = ({ playerId, username }) => {
             addLog(`${username} has left the room`)
-        })
+        }
         const playerWinHandler = ({ playerId, username }) => {
             addLog(`${username} has win the game`)
         }
-        socket.on('playerWin', playerWinHandler)
         const startGameHandler = () => {
             addLog(`Game has started!`)
         }
+
+        socket.on('playerJoinRoom', playerJoinRoomHandler)
+        socket.on('playerLeaveRoom', playerLeaveRoomHandler)
+        socket.on('playerWin', playerWinHandler)
         socket.on('startGame', startGameHandler)
         return () => {
-            socket.off('playerJoinRoom')
-            socket.off('playerLeaveRoom')
+            socket.off('playerJoinRoom', playerJoinRoomHandler)
+            socket.off('playerLeaveRoom', playerLeaveRoomHandler)
             socket.off('playerWin', playerWinHandler)
             socket.off('startGame', startGameHandler)
         }
@@ -74,19 +95,21 @@ function EloText() {
     const [data, setData] = useState(defaultData)
     const socket = useSocket()
     useEffect(() => {
-        socket.on('eloPreview', ({ win, draw, lose }) => {
+        const eloPreviewHandler = ({ win, draw, lose }) => {
             setDisplay(true)
             setData({ win, draw, lose })
-        })
+        }
         const roomPlayersChangedHandler = ({ players }) => {
             if (players.length === 1) {
                 setDisplay(false)
                 setData(defaultData)
             }
         }
+
+        socket.on('eloPreview', eloPreviewHandler)
         socket.on('roomPlayersChanged', roomPlayersChangedHandler)
         return () => {
-            socket.off('eloPreview')
+            socket.off('eloPreview', eloPreviewHandler)
             socket.off('roomPlayersChanged', roomPlayersChangedHandler)
         }
     })
@@ -116,46 +139,55 @@ export default function Room({ roomId }) {
     const [players, setPlayers] = useState([])
     const [ready, setReady] = useState(false)
     const isHost = players[0]?._id === playerId
+    const countdown = useCountdown({ initialTotalSec: 1 })
+    const { sec, reset, setToZero } = countdown
 
     useEffect(() => {
         const roomPlayersChangedHandler = ({ players }) => {
             setPlayers(players)
+            console.log(players)
             if (players.length === 1) setReady(false)
         }
-        socket.on('roomPlayersChanged', roomPlayersChangedHandler)
-        socket.on('ready', () => {
+        const readyHandler = () => {
             setReady(true)
-        })
-
-        socket.on('notReady', () => {
-            setReady(false)
-        })
-
-        socket.on('yourTurn', () => {
-            console.log('my turn')
-            setMyTurn(true)
-        })
-
-        const startGameHandler = ({ stone }) => {
-            setPlaying(true)
-            setStone(stone)
         }
-        socket.on('startGame', startGameHandler)
 
-        const playerWinHandler = async ({ playerId, username }) => {
+        const notReadyHandler = () => {
+            setReady(false)
+        }
+
+        const passTurnHandler = ({ playerId: currentTurn, duration }) => {
+            console.log('my turn')
+            setMyTurn(playerId === currentTurn ? true : false)
+            reset(duration)
+        }
+
+        const startGameHandler = ({ xPlayer }) => {
+            setPlaying(true)
+            setStone(playerId === xPlayer ? X : O)
+        }
+
+        const playerWinHandler = async ({ }) => {
             setPlaying(false)
             setStone(null)
             setMyTurn(false)
             setReady(false)
+            setToZero()
             await fetchCurrentUser()
         }
+
+        socket.on('roomPlayersChanged', roomPlayersChangedHandler)
+        socket.on('ready', readyHandler)
+        socket.on('notReady', notReadyHandler)
+        socket.on('passTurn', passTurnHandler)
+        socket.on('startGame', startGameHandler)
         socket.on('playerWin', playerWinHandler)
 
         return () => {
             socket.off('roomPlayersChanged', roomPlayersChangedHandler)
-            socket.off('yourTurn')
-            socket.off('ready')
-            socket.off('notReady')
+            socket.off('passTurn', passTurnHandler)
+            socket.off('ready', readyHandler)
+            socket.off('notReady', notReadyHandler)
             socket.off('playerWin', playerWinHandler)
             socket.off('startGame', startGameHandler)
             console.log('Room unmounted')
@@ -178,33 +210,35 @@ export default function Room({ roomId }) {
     }
 
     return (
-        <Flex direction='column' mb={8}>
-            <Flex align='center' mb={8}>
-                <Text fontWeight={600} fontSize='2xl'> Room #{roomId}</Text>
-                <Box ml='auto' >
-                    {
-                        !isPlaying &&
-                        (isHost ?
-                            <Button onClick={startGame} isDisabled={!ready} _focus={{ boxShadow: 'none' }} colorScheme='pink'>Start game</Button> :
-                            <Button w='100px' onClick={changeReadyState} _focus={{ boxShadow: 'none' }} colorScheme={ready ? 'blackAlpha' : 'pink'}>{ready ? 'Not ready' : 'Ready'}</Button>
-                        )
-                    }
-                    <Button onClick={leaveRoom} _focus={{ boxShadow: 'none' }} colorScheme='gray' ml={2}>Leave room</Button>
-                </Box>
+        <CountdownContext.Provider value={countdown}>
+            <Flex direction='column' mb={8}>
+                <Flex align='center' mb={8}>
+                    <Text fontWeight={600} fontSize='2xl'> Room #{roomId}</Text>
+                    <Box ml='auto' >
+                        {
+                            !isPlaying &&
+                            (isHost ?
+                                <Button onClick={startGame} isDisabled={!ready} _focus={{ boxShadow: 'none' }} colorScheme='pink'>Start game</Button> :
+                                <Button w='100px' onClick={changeReadyState} _focus={{ boxShadow: 'none' }} colorScheme={ready ? 'blackAlpha' : 'pink'}>{ready ? 'Not ready' : 'Ready'}</Button>
+                            )
+                        }
+                        <Button onClick={leaveRoom} _focus={{ boxShadow: 'none' }} colorScheme='gray' ml={2}>Leave room</Button>
+                    </Box>
+                </Flex>
+                <SimpleGrid columns={4}>
+                    <GridItem colSpan={[4, null, null, 3]}>
+                        <Board sec={sec} isMyTurn={isMyTurn} onMove={() => setMyTurn(false)} roomId={roomId} stone={stone} isPlaying={isPlaying} />
+                    </GridItem>
+                    <GridItem colSpan={[4, null, null, 1]}>
+                        <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[0]?._id === playerId} player={players[0]} myStone={stone} isHost />
+                        <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[1]?._id === playerId} player={players[1]} myStone={stone} ready={ready} />
+                        <Text fontWeight={600} fontSize='2xl' my={2}>ELO</Text>
+                        <EloText />
+                        <Text fontWeight={600} fontSize='2xl' my={2}>Activity</Text>
+                        <ActivityLog />
+                    </GridItem>
+                </SimpleGrid>
             </Flex>
-            <SimpleGrid columns={4}>
-                <GridItem colSpan={[4, null, null, 3]}>
-                    <Board isMyTurn={isMyTurn} onMove={() => setMyTurn(false)} roomId={roomId} stone={stone} isPlaying={isPlaying} />
-                </GridItem>
-                <GridItem colSpan={[4, null, null, 1]}>
-                    <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[0]?._id === playerId} player={players[0]} myStone={stone} isHost />
-                    <PlayerPanel isPlaying={isPlaying} isMyTurn={isMyTurn} isMe={players[1]?._id === playerId} player={players[1]} myStone={stone} ready={ready} />
-                    <Text fontWeight={600} fontSize='2xl' my={2}>ELO</Text>
-                    <EloText />
-                    <Text fontWeight={600} fontSize='2xl' my={2}>Activity</Text>
-                    <ActivityLog />
-                </GridItem>
-            </SimpleGrid>
-        </Flex>
+        </CountdownContext.Provider>
     )
 }

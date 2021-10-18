@@ -43,21 +43,22 @@ function PlayerList() {
     const socket = useContext(SocketContext)
     useEffect(() => {
         socket.emit('requestPlayers')
-        socket.on('playersChanged', ({ players }) => {
+        const playersChangedHandler = ({ players }) => {
             setPlayers(getArrayEntries(players))
-        })
+        }
+        socket.on('playersChanged', playersChangedHandler)
         return () => {
-            socket.off('playersChanged')
+            socket.off('playersChanged', playersChangedHandler)
         }
     }, [socket])
 
     return (
-        <>
+        <Flex direction='column' align='flex-end'>
             <Text fontSize='2xl' mb={2} fontWeight={600}>Online players ({players.length})</Text>
             <Box height='600px' overflowY='auto'>
                 {players.map(player => <Text key={player._id}>{player.username} ({player.elo})</Text>)}
             </Box>
-        </>
+        </Flex>
     )
 }
 
@@ -79,29 +80,48 @@ export default function Lobby() {
             unmounted = false
             return
         }
+
+        const forceDisconnectHandler = () => {
+            setForceDisconnected(true)
+            socket.disconnect()
+        }
+
+        const joinRoomHandler = ({ roomId }) => {
+            console.log(`join room ${roomId}`)
+            setRoomId(roomId)
+        }
+
+        const leaveRoomHandler = () => {
+            setRoomId(null)
+        }
+
+        const joinRoomFailedHandler = ({ message }) => {
+            errorToast({ title: 'Join room failed', description: message })
+        }
+
+        const joinLobbyHandler = () => {
+            setJoinLobby(true)
+            socket.on('joinRoom', joinRoomHandler)
+            socket.on('leaveRoom', leaveRoomHandler)
+            socket.on('joinRoomFailed', joinRoomFailedHandler)
+        }
+
+
         socket.on('connect', () => {
             socket.emit('requestJoinLobby', ({ playerId }))
-            socket.on('forceDisconnect', () => {
-                setForceDisconnected(true)
-                socket.disconnect()
-            })
-            socket.on('joinLobby', () => {
-                setJoinLobby(true)
-                socket.on('joinRoom', ({ roomId }) => {
-                    console.log(`join room ${roomId}`)
-                    setRoomId(roomId)
-                })
-                socket.on('leaveRoom', () => {
-                    setRoomId(null)
-                })
-                socket.on('joinRoomFailed', ({ message }) => {
-                    errorToast({ title: 'Join room failed', description: message })
-                })
-            })
+            socket.on('forceDisconnect', forceDisconnectHandler)
+            socket.on('joinLobby', joinLobbyHandler)
 
         })
         return () => {
-            if (unmounted) socket.disconnect()
+            if (unmounted) {
+                socket.off('joinRoom', joinRoomHandler)
+                socket.off('leaveRoom', leaveRoomHandler)
+                socket.off('joinRoomFailed', joinRoomFailedHandler)
+                socket.off('forceDisconnect', forceDisconnectHandler)
+                socket.off('joinLobby', joinLobbyHandler)
+                socket.disconnect()
+            }
         }
     }, [socket])
 
@@ -118,14 +138,14 @@ export default function Lobby() {
                             roomId !== null ? <Room roomId={roomId} /> :
                                 <>
                                     <Flex align='center'>
-                                        <Box>
+                                        <Flex>
                                             <Text fontSize='xl' mr={2}>Welcome, {username}!</Text>
-                                            <Text fontSize='xl' mr={2}><chakra.span fontWeight={600}>ELO:</chakra.span> {elo}</Text>
-                                        </Box>
-                                        <Box ml='auto'>
+                                            <Text fontSize='xl' mr={4}><chakra.span fontWeight={600}>ELO:</chakra.span> {elo}</Text>
+                                        </Flex>
+                                        <Flex ml='auto' align='center'>
                                             <Button type='button' onClick={createRoom} mr={2} _focus={{ boxShadow: 'none' }} border colorScheme='pink'>Create room</Button>
                                             <Button type='button' onClick={logout} mr={2} _focus={{ boxShadow: 'none' }} border colorScheme='gray'>Log out</Button>
-                                        </Box>
+                                        </Flex>
                                     </Flex>
                                     <SimpleGrid columns={2} spacing={4} mt={4}>
                                         <GridItem>

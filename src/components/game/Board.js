@@ -35,13 +35,14 @@ const emptyBoard = [
     [E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E, E,],
 ]
 
-export default function Board({ isPlaying, stone, roomId, isMyTurn, onMove }) {
+export default function Board({ isPlaying, stone, roomId, isMyTurn, onMove, sec }) {
     const [board, setBoard] = useState(clone2D(emptyBoard))
     const socket = useContext(SocketContext)
     const player = useAuthStore(s => s.player)
     const { _id: playerId } = player || {}
 
     useEffect(() => {
+        console.log('board use effect')
         const addMove = (({ r, c, stone }) => {
             setBoard(board => {
                 const newBoard = clone2D(board)
@@ -49,28 +50,37 @@ export default function Board({ isPlaying, stone, roomId, isMyTurn, onMove }) {
                 return newBoard
             })
         })
-        console.log('board use effect')
+
         const startGameHandler = () => {
             setBoard(clone2D(emptyBoard))
         }
-        socket.on('startGame', startGameHandler)
-        socket.on('move', ({ r, c, stone }) => {
+
+        const moveHandler = ({ r, c, stone }) => {
             console.log({ r, c, stone })
             addMove({ r, c, stone })
-        })
-        socket.on('resetBoard', () => {
+        }
+
+        const resetBoardHandler = () => {
             setBoard(clone2D(emptyBoard))
-        })
+        }
+
+        socket.on('startGame', startGameHandler)
+        socket.on('move', moveHandler)
+        socket.on('resetBoard', resetBoardHandler)
+
         return () => {
-            socket.off('move')
+            socket.off('move', moveHandler)
             socket.off('startGame', startGameHandler)
+            socket.off('resetBoardHandler')
+
             console.log('board unmounted')
         }
     }, [socket])
 
+    const clickable = isPlaying && isMyTurn && sec > 0
 
     function onCellClick({ r, c }) {
-        if (!isMyTurn) return
+        if (!clickable) return
         if (board[r][c] !== E) return
         socket.emit('move', { playerId, r, c, roomId })
         onMove()
@@ -81,7 +91,7 @@ export default function Board({ isPlaying, stone, roomId, isMyTurn, onMove }) {
             <SimpleGrid mx='auto' w={NUM_ROW * CELL_SIZE} columns={NUM_COL} >
                 {board.map((row, r) =>
                     row.map((stone, c) =>
-                        <Cell key={r * NUM_COL + c} r={r} c={c} stone={board[r][c]} clickable={isPlaying && isMyTurn && stone === E} onClick={() => onCellClick({ r, c })} />
+                        <Cell key={r * NUM_COL + c} r={r} c={c} stone={board[r][c]} clickable={clickable && stone === E} onClick={() => onCellClick({ r, c })} />
                     )
                 )}
             </SimpleGrid>
