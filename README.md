@@ -20,4 +20,4 @@ Online multiplayer Gomoku (Five in a Row) - a strategy board game. (working in p
 
 ## Preview
 
-![image](https://user-images.githubusercontent.com/56820749/135973552-82276bdf-0be6-4b48-a9f2-3df62c42c3e0.png)
+![Untitled](https://user-images.githubusercontent.com/56820749/146313917-5cc254e5-dc05-4a1c-b6a3-b7b4031f8510.png)
