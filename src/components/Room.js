@@ -272,6 +272,7 @@ export default function Room({ roomId }) {
 						colSpan={[4, null, null, null, 1]}
 						display={'flex'}
 						flexDir={'column'}
+						justifyContent={'center'}
 						alignItems={'flex-end'}
 					>
 						<Text fontWeight={600} fontSize="2xl">
