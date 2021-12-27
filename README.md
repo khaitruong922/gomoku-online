@@ -1,6 +1,6 @@
 # Gomoku Online
 
-Online multiplayer Gomoku (Five in a Row) - a strategy board game. (working in progress)
+An online multiplayer Gomoku chess (Five in a Row) - with lobby and ELO system.
 
 [Game rules - Wikipedia](https://en.wikipedia.org/wiki/Gomoku)
 
@@ -12,9 +12,9 @@ Online multiplayer Gomoku (Five in a Row) - a strategy board game. (working in p
 
 ## Features
 
-- **Lobby**: Display all online players and rooms to join.
+- **Lobby**: Create or join room to play against other players.
 
-- **ELO rating system**: Compete against other players to climb to the top of ladder.
+- **ELO rating system**: Prove your skills and climb to the top of ladder.
 
 - **Login & Register**: Save your ELO rating with your account.
 
